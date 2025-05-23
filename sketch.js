@@ -1,94 +1,80 @@
-let totalFrames = 800;
-let t;
+let state = 'intro';
+let introTimer = 0;
+let transitionTimer = 0;
+let mainCircleSize = 60;
+let circles = [];
+let particles = [];
+let separationProgress = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  frameRate(60);
+  ellipseMode(RADIUS);
   noStroke();
+
+  // 4 círculos ao redor do centro
+  for (let i = 0; i < 4; i++) {
+    let angle = map(i, 0, 4, 0, TWO_PI);
+    let x = width / 2 + cos(angle) * 60;
+    let y = height / 2 + sin(angle) * 60;
+    circles.push({ x, y, radius: 6, alpha: 255 });
+  }
 }
 
 function draw() {
   background(0);
-  translate(width / 2, height / 2);
-  t = frameCount / totalFrames;
 
-  animarFusaoMetaball(t);
-}
+  if (state === 'intro') {
+    drawIntro();
+    introTimer++;
 
-function animarFusaoMetaball(t) {
-  // Fases da animação
-  let t1 = constrain(map(t, 0.0, 0.25, 0, 1), 0, 1); // aproximação
-  let t2 = constrain(map(t, 0.25, 0.4, 0, 1), 0, 1); // fusão líquida
-  let t3 = constrain(map(t, 0.4, 0.5, 0, 1), 0, 1); // pulso
-  let t4 = constrain(map(t, 0.5, 0.6, 0, 1), 0, 1); // partículas
-
-  let cor = color('#2C6AAE');
-  fill(cor);
-
-  // 1. Aproximação com dois círculos
-  if (t < 0.25) {
-    let x1 = lerp(-100, -20, easeOutCubic(t1));
-    let x2 = lerp(100, 20, easeOutCubic(t1));
-    circle(x1, 0, 40);
-    circle(x2, 0, 40);
-  }
-
-  // 2. Fusão estilo metaball
-  else if (t < 0.4) {
-    let offset = lerp(80, 0, easeOutCubic(t2));
-    metaball(-offset / 2, 0, 40, offset / 2, 0, 40);
-  }
-
-  // 3. Pulso do círculo central
-  else if (t < 0.5) {
-    let r = 40 + sin(t3 * PI) * 10;
-    circle(0, 0, r);
-  }
-
-  // 4. Explosão suave de partículas
-  else if (t < 0.6) {
-    let numParticles = 24;
-    for (let i = 0; i < numParticles; i++) {
-      let angle = TWO_PI * i / numParticles;
-      let dist = easeOutCubic(t4) * 100;
-      let x = cos(angle) * dist;
-      let y = sin(angle) * dist;
-      fill(255, map(t4, 0, 1, 255, 0));
-      ellipse(x, y, 4, 4);
+    if (introTimer > 90) {
+      for (let c of circles) c.alpha -= 4;
+      if (circles[0].alpha <= 0) {
+        state = 'sellside';
+        transitionTimer = 0;
+      }
     }
+  } else if (state === 'sellside') {
+    drawSellSide();
   }
 }
 
-// Função metaball simples entre dois círculos
-function metaball(x1, y1, r1, x2, y2, r2) {
-  let d = dist(x1, y1, x2, y2);
-  let maxDist = 100;
-  let threshold = 0.5;
-
-  // Desenha os dois círculos
-  ellipse(x1, y1, r1 * 2);
-  ellipse(x2, y2, r2 * 2);
-
-  if (d < maxDist) {
-    // Conecta os dois com uma forma fluida
-    let midpoint = createVector((x1 + x2) / 2, (y1 + y2) / 2);
-    beginShape();
-    for (let a = 0; a < TWO_PI; a += PI / 60) {
-      let vx = midpoint.x + cos(a) * (r1 + r2) / 2;
-      let vy = midpoint.y + sin(a) * (r1 + r2) / 2;
-      let alpha = map(d, 0, maxDist, 255, 0);
-      fill(44, 106, 174, alpha);
-      vertex(vx, vy);
-    }
-    endShape(CLOSE);
+function drawIntro() {
+  stroke(255);
+  strokeWeight(2);
+  line(width / 2, height / 2 - 80, width / 2, height / 2 + 80);
+  noStroke();
+  for (let c of circles) {
+    fill(255, c.alpha);
+    ellipse(c.x, c.y, c.radius);
   }
 }
 
-// Easing para suavizar o movimento
-function easeOutCubic(x) {
-  return 1 - pow(1 - x, 3);
+function drawSellSide() {
+  transitionTimer++;
+  let maxOffset = 150;
+  let offset = easeOutQuad(min(1, transitionTimer / 120)) * maxOffset;
+
+  let leftX = width / 2 - offset;
+  let rightX = width / 2 + offset;
+  let y = height / 2;
+
+  // Efeito de bolha fluido entre os dois círculos
+  for (let i = -mainCircleSize; i <= mainCircleSize; i += 6) {
+    let inter = map(i, -mainCircleSize, mainCircleSize, 0, 1);
+    let x = lerp(leftX, rightX, 0.5) + sin(frameCount * 0.08 + i * 0.1) * 4;
+    let yOff = y + i;
+    fill(255, 30);
+    ellipse(x, yOff, 2, 2);
+  }
+
+  // Os dois círculos principais
+  fill(255, 180);
+  ellipse(leftX, y, mainCircleSize);
+  ellipse(rightX, y, mainCircleSize);
 }
 
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
+function easeOutQuad(t) {
+  return t * (2 - t);
 }
+
